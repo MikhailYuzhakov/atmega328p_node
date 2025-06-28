@@ -115,24 +115,25 @@ class Transiever
         }
 
         String sendDataPacket(uint8_t* dataOut, uint8_t pointer) {
-            String result = "";
-            dataOut[pointer] = crc8_bitwise(dataOut, pointer-1);
-
+            pointer++;
+            dataOut[pointer] = crc8_bitwise(dataOut, pointer - 1);
+            
             LoRa.beginPacket();
-            LoRa.write(dataOut, pointer+1);
+            LoRa.write(dataOut, pointer + 1);
             LoRa.endPacket();
 
-            result += "Отправлено байт: ";
-            result += pointer+1;
-            result += " | Данные (HEX): ";
+            // Оптимизированное формирование строки
+            String result = "Отправлено байт: " + String(pointer + 1) + " | Данные (HEX): ";
+            
+            char buf[4]; // Буфер для HEX-значений
             for (uint8_t i = 0; i < pointer+1; i++) {
-                result += String(dataOut[i], HEX);
-                result += " ";
+                sprintf(buf, "%02X ", dataOut[i]); // Форматируем с ведущим нулём
+                result += buf;
             }
-                
-
-            result += " CRC8 = ";
-            result += String(dataOut[pointer], HEX);
+            
+            result += "CRC8 = ";
+            sprintf(buf, "%02X", dataOut[pointer]);
+            result += buf;
             
             return result;
         }
@@ -143,42 +144,61 @@ class Transiever
          */
         String receivePacket(uint8_t* dataIn, uint16_t timeout_ms = 2000) {
             String result = "";
-            uint16_t startTime = millis(); // Засекаем время начала ожидания
+            result.reserve(128); // Заранее резервируем память
+            
+            long startTime = millis();
+            bool packetReceived = false;
+            uint8_t i = 0;
+            uint8_t packetSize = 0;
 
-            // Ожидаем пакет в течение timeout_ms миллисекунд
+            // Ожидание пакета
             while (millis() - startTime < timeout_ms) {
-                int packetSize = LoRa.parsePacket();
-                
-                if (packetSize > 0) {
-                    result += "Принято байт: ";
-                    result += String(packetSize);
-                    result += " | Данные (HEX): ";
-
-                    uint8_t i = 0;
-                    while (LoRa.available() && i < packetSize) {
-                        dataIn[i] = LoRa.read();
-                        result += String(dataIn[i], HEX);
-                        result += " "; // Разделитель для удобства чтения
-                        i++;
-                    }
-                    uint8_t calculatedCrc8 = crc8_bitwise(dataIn, i-2);
-                    if (calculatedCrc8 == dataIn[i-1]) {
-                        result += "\nКонтрольная сумма верна";
-                    } else {
-                        result += "\nКонтрольная сумма неверная";
-                        result += "\nКонтрольная сумма пакета: "; 
-                        result += String(dataIn[i-1], HEX);
-                        result += "\nКонтрольная сумма расчитанная: ";
-                        result += String(calculatedCrc8, HEX);
-                    }
-
-                    return result; // Пакет успешно принят
+                int pSize = LoRa.parsePacket();
+                if (pSize > 0) {
+                    packetSize = pSize;
+                    packetReceived = true;
+                    break;
                 }
-
-                delay(10); // Небольшая задержка, чтобы не нагружать процессор
+                delay(10);
             }
 
-            return "Ошибка: пакет не получен за " + String(timeout_ms) + " мс";
+            if (!packetReceived) {
+                return "Ошибка: пакет не получен за " + String(timeout_ms) + " мс";
+            }
+
+            // Чтение данных
+            char hexBuf[4]; // Буфер для HEX-значений
+            result = "Принято байт: ";
+            result += String(packetSize);
+            result += " | Данные (HEX): ";
+
+            while (LoRa.available() && i < packetSize) {
+                dataIn[i] = LoRa.read();
+                
+                // Форматирование в HEX с ведущим нулем
+                snprintf(hexBuf, sizeof(hexBuf), "%02X ", dataIn[i]);
+                result += hexBuf;
+                i++;
+            }
+
+            // Проверка CRC
+            uint8_t calculatedCrc = crc8_bitwise(dataIn, i-2);
+            uint8_t receivedCrc = dataIn[i-1];
+
+            result += "\nCRC: Пакет=";
+            snprintf(hexBuf, sizeof(hexBuf), "%02X", receivedCrc);
+            result += hexBuf;
+            result += " Вычислено=";
+            snprintf(hexBuf, sizeof(hexBuf), "%02X", calculatedCrc);
+            result += hexBuf;
+
+            if (calculatedCrc == receivedCrc) {
+                result += " (Верно)";
+            } else {
+                result += " (Ошибка)";
+            }
+
+            return result;
         }
 };
 

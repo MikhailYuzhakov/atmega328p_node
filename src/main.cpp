@@ -3,8 +3,8 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <OneWire.h>
-// #include <Sleep_n0m1.h> //библиотека для сна
 #include <EEPROM.h>
+#include <Sleep_n0m1.h>
 #include "Sensors.h"
 #include "Transiever.h"
 #include "RealTimeClock.h"
@@ -22,10 +22,10 @@
 
 SoftwareSerial mySerial(5, 6); // RX, TX
 OneWire oneWire(DS18B20_PIN);
-// Sleep sleep; //объявляем класс для сна
 Sensors sensors;
 Transiever sx1276;
 RealTimeClock rtc;
+Sleep deepSleep;
 
 
 uint8_t dataOut[MAX_PACKET_SIZE];
@@ -62,10 +62,20 @@ String uint64_to_array(uint64_t value, uint8_t* array) {
     return result;
 }
 
+void clearInputOutputBuffer() {
+  //очищаем буффер
+  for (uint8_t i = 0; i < MAX_PACKET_SIZE; i++) {
+    dataIn[i] = 0;
+    dataOut[i] = 0;
+  }
+}
+
 //a3 f5 e2 d8 1c 9b 4e 7f
 void setup() {
   mySerial.begin(9600);
-  
+  // pinMode(INT0_PIN, INPUT_PULLUP);
+  // pwrManager.setupInterrupt(INT0_PIN);
+
   mySerial.print("\nAgroprobe ID: ");
   uuid = readID();
   mySerial.print("\nAlarm period: ");
@@ -86,6 +96,8 @@ void setup() {
 }
 
 void loop() {
+  clearInputOutputBuffer();
+
   dataOut[pointer++] = 0x7F; // записываем в 0 байт протокол
   uint64_to_array(uuid, &dataOut[1]); // записываем ID  зонда с 1 по 8 байт
   pointer = 9;
@@ -93,13 +105,27 @@ void loop() {
   for (uint8_t i = 0; i < 6; i++)
     dataOut[pointer++] = dateTime[i]; // записываем с 9 по 14 байт дату и время
   mySerial.print(sensors.readPressure(dataOut, pointer)); // 15 и 16 байт атмосферное давление
-  mySerial.print(sensors.readAirTemperature(dataOut, pointer)); // 17-20 байт температура с bmp и c htu
-  mySerial.print(sensors.readAirHumidity(dataOut, pointer)); // 21 байт влажность с htu
+  pointer++; //явно увеличиваем указатель в выходном буффере
+
+  mySerial.print(sensors.readAirTemperature(dataOut, pointer)); // 17-18, 19-20 байт температура с bmp и c htu
+  pointer++;
+
+  mySerial.print(sensors.readAirHumidity(dataOut, pointer)); // 21-22 байт влажность с htu
   mySerial.println();
   
   mySerial.println(sx1276.sendDataPacket(dataOut, pointer));
+  // delay(100);
+  mySerial.println(sx1276.receivePacket(dataIn, 10000));
+  // delay(100);
+
+  mySerial.println(rtc.setRTCDateTime(&dataIn[9])); // синхронизируем время
 
   pointer = 0;
-  delay(10000);
+  
+  mySerial.println(rtc.setAlarm(0, 10));
+  mySerial.println();
+  deepSleep.pwrDownMode();
+  deepSleep.sleepPinInterrupt(INT0_PIN, FALLING);
+  // pwrManager.enterDeepSleep(INT0_PIN);
 }
 

@@ -77,7 +77,7 @@ class Sensors
             // Проверка на переполнение (0-65535 mmHg)
             if (pressure >= 0 && pressure <= 65535) {
                 dataOut[pointer++] = (value >> 8) & 0xFF;  // Старший байт
-                dataOut[pointer++] = value & 0xFF;         // Младший байт
+                dataOut[pointer] = value & 0xFF;         // Младший байт
             } else {
                 result += " (OUT OF RANGE)";
             }
@@ -114,7 +114,7 @@ class Sensors
             dataOut[pointer++] = (airTempBmp280 >> 8) & 0xFF;
             dataOut[pointer++] = airTempBmp280 & 0xFF;
             dataOut[pointer++] = (airTempHtu21 >> 8) & 0xFF;
-            dataOut[pointer++] = airTempHtu21 & 0xFF;
+            dataOut[pointer] = airTempHtu21 & 0xFF;
             
             return result;
         }
@@ -135,9 +135,9 @@ class Sensors
             result += String(airHumidity, 1);
             result += "%";
 
-            uint16_t airHumidityHtu21 = (uint16_t)round(airHumidity * 100);
+            uint16_t airHumidityHtu21 = (uint16_t)round(airHumidity * 10);
             dataOut[pointer++] = (airHumidityHtu21 >> 8) & 0xFF;
-            dataOut[pointer++] = airHumidityHtu21 & 0xFF;
+            dataOut[pointer] = airHumidityHtu21 & 0xFF;
 
             return result;
         }

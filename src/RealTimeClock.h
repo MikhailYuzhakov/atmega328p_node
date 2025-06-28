@@ -6,10 +6,33 @@ DS3232RTC myRTC;
 class RealTimeClock
 {
     private:
-        /* data */
+        uint8_t bcd2dec(uint8_t n)
+        {
+            return n - 6 * (n >> 4);
+        }
+
+        String printAlarmDate() {
+            uint8_t value[2];
+            String result = "Время пробуждения: ";
+            myRTC.readRTC(0x08, value, 2);
+
+
+            if (bcd2dec(value[1]) < 10)
+                result += "0";
+            result += bcd2dec(value[1]);
+            result += ":";
+
+            if (bcd2dec(value[0]) < 10)
+                result += 0;
+            result += bcd2dec(value[0]);
+            return result;
+        }
+
     public:
         String init() {
             myRTC.begin();
+            myRTC.squareWave(myRTC.SQWAVE_NONE); //конфигурируем пин SQW (DS3231) на прерывания
+            myRTC.alarmInterrupt(myRTC.ALARM_1, true); //разрешаем прерывания по 1 будильнику
             return "RTC init successfully.";
         }
 
@@ -23,8 +46,9 @@ class RealTimeClock
          * [4] - минуты (0-59)
          * [5] - секунды (0-59)
          */
-        void setRTCDateTime(const uint8_t* datetime) {
+        String setRTCDateTime(const uint8_t* datetime) {
             tmElements_t tm;
+            String currentDateTime = "Синхронизированы дата и время: ";
             
             // Заполняем структуру tmElements_t из массива
             tm.Day = datetime[0];          // День (1-31)
@@ -33,12 +57,41 @@ class RealTimeClock
             tm.Hour = datetime[3];         // Часы (0-23)
             tm.Minute = datetime[4];       // Минуты (0-59)
             tm.Second = datetime[5];       // Секунды (0-59)
+            
+            if (datetime[0] < 10)
+                currentDateTime += "0";
+            currentDateTime += String(datetime[0]);
+            currentDateTime += ".";
+
+            if (datetime[1] < 10)
+                currentDateTime += "0";
+            currentDateTime += String(datetime[1]);
+            currentDateTime += ".";
+
+            currentDateTime += "20";
+            currentDateTime += String(datetime[2]);
+            currentDateTime += " ";
+
+            if (datetime[3] < 10)
+                currentDateTime += "0";
+            currentDateTime += String(datetime[3]);
+            currentDateTime += ":";
+
+            if (datetime[4] < 10)
+                currentDateTime += "0";
+            currentDateTime += String(datetime[4]);
+            currentDateTime += ":";
+
+            if (datetime[5] < 10)
+                currentDateTime += "0";
+            currentDateTime += String(datetime[5]);
 
             // Преобразуем в time_t (UNIX-время)
             time_t t = makeTime(tm);
             
             // Устанавливаем время в DS3231
             myRTC.set(t);
+            return currentDateTime;
         }
 
         uint8_t* getCurrentDateTime() {
@@ -59,5 +112,27 @@ class RealTimeClock
             datetime[5] = tm.Second;         // Секунды (0-59)
             return datetime;
         }
+
+        String setAlarm(uint8_t hour, uint8_t min) {
+            String result = "";
+            uint8_t* datetime = getCurrentDateTime();
+
+            if (datetime[4] + min > 59) {
+                min = datetime[4] + min - 60;
+                hour++;
+            } else min = datetime[4] + min;
+
+            if (datetime[3] + hour > 23) hour = 0 + datetime[3] + hour - 24;
+            else hour = datetime[3] + hour;
+
+            uint8_t sec = datetime[5];
+
+            myRTC.setAlarm(myRTC.ALM1_MATCH_HOURS, sec, min, hour, 0);
+            myRTC.alarm(myRTC.ALARM_1); //очищаем флаг будильника ALARM_1
+
+            return printAlarmDate();
+        }
+
+
         
 };
