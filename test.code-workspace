@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../Documents/test"
+		},
+		{
+			"name": "atmega328",
+			"path": "../../../../../Documents/PlatformIO/Projects/atmega328"
+		}
+	],
+	"settings": {}
+}
