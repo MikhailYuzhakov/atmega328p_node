@@ -25,13 +25,10 @@ class Transiever
         /*
         Конвертирует uint64_t в 8 элементов массива типа uint8_t
         */
-        String uint64_to_array(uint64_t value, uint8_t* array) {
-            String result = "";
+        void uint64_to_array(uint64_t value, uint8_t* array) {
             for (int i = 0; i < 8; ++i) {
                 array[i] = (value >> (8 * (7 - i))) & 0xFF;
-                result += String(array[i], HEX);
             }
-            return result;
         }
         /*
         Считает контрольную сумму CRC-8 побитовым сдвигом и полиномом 0x1D
@@ -55,11 +52,10 @@ class Transiever
         }
 
     public:
-        String init()
-        {
+        void init(SoftwareSerial &mySerial) {
             uint32_t freq, bw;
-            uint8_t sf, pwr;
-            String result = "----------------------------------------------------------\n";
+            uint8_t sf, pwr, cr;
+            cr = 4;
 
             freq = EEPROM.read(11);
             freq |= freq << 8;
@@ -70,51 +66,51 @@ class Transiever
             bw = bw * 1000;
             sf = EEPROM.read(13);
             pwr = EEPROM.read(14);
-            // pinMode(TXEN, OUTPUT);
-            // pinMode(RXEN, OUTPUT);
 
             LoRa.setPins(NSS, RST, DIO0);
-            if (LoRa.begin(868E6)) 
-                result += "SX1276 is ok.";
-            else result += "SX1276 is failed.";
+            if (LoRa.begin(freq)) 
+                mySerial.print("Transiever...ok\n");
+            else 
+                mySerial.print("Transiever...failed\n");
 
             LoRa.setSignalBandwidth(bw);
             LoRa.setSpreadingFactor(sf);
-            LoRa.setCodingRate4(4);
+            LoRa.setCodingRate4(cr);
             LoRa.setTxPower(pwr);
-            // txEnable();
 
-            result = result + "\nПараметры SX1276:\nЧастота = " + freq + " Гц\n";
-            result = result + "Ширина полосы = " + bw + " Гц\n";
-            result = result + "Spreading factor = " + sf + "\n";
-            // result = result + "Мощность = " + pwr + " дБм\n";       
-            return result;
+            mySerial.println("Transiever config:");
+            mySerial.printf("Frequency = %lu Hz\n", freq);
+            mySerial.printf("Bandwidth = %lu Hz\n", bw);
+            mySerial.printf("Spreading factor = %u\n", sf);
+            mySerial.printf("Coding rate = %u\n", cr);
+            mySerial.printf("Power = %d dBm\n", pwr);
         }
 
-        String sendHandshakePacket(uint64_t uuid) {
+        void sendHandshakePacket(uint64_t uuid, SoftwareSerial &mySerial) {
             uint8_t dataOut[HS_PACKET_SIZE];
-            String res1 = "ID = ";
-        
+            char buf[4]; // Буфер для HEX-значений
 
             dataOut[0] = 0x8F; //байт для рукопожатия
-            res1 += uint64_to_array(uuid, &dataOut[1]); //записываем UUID в dataOut с 1 по 8 байт включительно
+            uint64_to_array(uuid, &dataOut[1]); //записываем UUID в dataOut с 1 по 8 байт включительно
             dataOut[9] = crc8_bitwise(dataOut, HS_PACKET_SIZE-1);
 
             LoRa.beginPacket();
             LoRa.write(dataOut, sizeof(dataOut));
             LoRa.endPacket();
 
-            res1 += "\nHandshake packet is sent = ";
-            for (uint8_t i = 0; i < sizeof(dataOut); i++)
-                res1 += String(dataOut[i], HEX);
+            mySerial.print("Send bytes (handshake): " + String(HS_PACKET_SIZE) +  "| Data (HEX):");
+            for (uint8_t i = 0; i < sizeof(dataOut); i++) {
+                sprintf(buf, "%02X ", dataOut[i]); // Форматируем с ведущим нулём
+                mySerial.print(buf);
+            }
 
-            res1 += " CRC8 = ";
-            res1 += String(dataOut[HS_PACKET_SIZE-1], HEX);
-            
-            return res1;
+            mySerial.print("CRC8 = ");
+            sprintf(buf, "%02X", dataOut[HS_PACKET_SIZE-1]);
+            mySerial.print(buf);
+            mySerial.println();
         }
 
-        String sendDataPacket(uint8_t* dataOut, uint8_t pointer) {
+        void sendDataPacket(uint8_t* dataOut, uint8_t &pointer, SoftwareSerial &mySerial) {
             pointer++;
             dataOut[pointer] = crc8_bitwise(dataOut, pointer - 1);
             
@@ -123,29 +119,27 @@ class Transiever
             LoRa.endPacket();
 
             // Оптимизированное формирование строки
-            String result = "Отправлено байт: " + String(pointer + 1) + " | Данные (HEX): ";
+            mySerial.print("Send bytes: ");
+            mySerial.print(pointer+1);
+            mySerial.print(" | Data (HEX): ");
             
             char buf[4]; // Буфер для HEX-значений
             for (uint8_t i = 0; i < pointer+1; i++) {
                 sprintf(buf, "%02X ", dataOut[i]); // Форматируем с ведущим нулём
-                result += buf;
+                mySerial.print(buf);
             }
             
-            result += "CRC8 = ";
+            mySerial.print("CRC8 = ");
             sprintf(buf, "%02X", dataOut[pointer]);
-            result += buf;
-            
-            return result;
+            mySerial.print(buf);
+            mySerial.println();
         }
 
         /**
          * Принимает пакет и записывает содержимое в переменную dataIn.
          * return сообщения об отладке в строковом типе.
          */
-        String receivePacket(uint8_t* dataIn, uint16_t timeout_ms = 2000) {
-            String result = "";
-            result.reserve(128); // Заранее резервируем память
-            
+        void receivePacket(uint8_t* dataIn, SoftwareSerial &mySerial, uint16_t timeout_ms) {          
             long startTime = millis();
             bool packetReceived = false;
             uint8_t i = 0;
@@ -163,21 +157,21 @@ class Transiever
             }
 
             if (!packetReceived) {
-                return "Ошибка: пакет не получен за " + String(timeout_ms) + " мс";
+                mySerial.print("Error timeout ");
+                mySerial.print(timeout_ms);
+                mySerial.print(" мс\n");
             }
 
             // Чтение данных
             char hexBuf[4]; // Буфер для HEX-значений
-            result = "Принято байт: ";
-            result += String(packetSize);
-            result += " | Данные (HEX): ";
+            mySerial.print("Recieve bytes: " + String(packetSize) + " | Data (HEX): ");
 
             while (LoRa.available() && i < packetSize) {
                 dataIn[i] = LoRa.read();
                 
                 // Форматирование в HEX с ведущим нулем
                 snprintf(hexBuf, sizeof(hexBuf), "%02X ", dataIn[i]);
-                result += hexBuf;
+                mySerial.print(hexBuf);
                 i++;
             }
 
@@ -185,20 +179,16 @@ class Transiever
             uint8_t calculatedCrc = crc8_bitwise(dataIn, i-2);
             uint8_t receivedCrc = dataIn[i-1];
 
-            result += "\nCRC: Пакет=";
             snprintf(hexBuf, sizeof(hexBuf), "%02X", receivedCrc);
-            result += hexBuf;
-            result += " Вычислено=";
+            mySerial.print(" CRC8: in packet = 0x" + String(hexBuf));
             snprintf(hexBuf, sizeof(hexBuf), "%02X", calculatedCrc);
-            result += hexBuf;
+            mySerial.print(" calculated = 0x" + String(hexBuf));
 
             if (calculatedCrc == receivedCrc) {
-                result += " (Верно)";
+                mySerial.print(" correct\n");
             } else {
-                result += " (Ошибка)";
+                mySerial.print(" uncorrect\n");
             }
-
-            return result;
         }
 };
 

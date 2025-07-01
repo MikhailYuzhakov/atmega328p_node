@@ -13,7 +13,7 @@ class RealTimeClock
 
         String printAlarmDate() {
             uint8_t value[2];
-            String result = "Время пробуждения: ";
+            String result = "Alarm time: ";
             myRTC.readRTC(0x08, value, 2);
 
 
@@ -29,11 +29,11 @@ class RealTimeClock
         }
 
     public:
-        String init() {
+        void init(SoftwareSerial &mySerial) {
             myRTC.begin();
             myRTC.squareWave(myRTC.SQWAVE_NONE); //конфигурируем пин SQW (DS3231) на прерывания
             myRTC.alarmInterrupt(myRTC.ALARM_1, true); //разрешаем прерывания по 1 будильнику
-            return "RTC init successfully.";
+            mySerial.print("RTC...ok\n");
         }
 
         /**
@@ -48,7 +48,7 @@ class RealTimeClock
          */
         String setRTCDateTime(const uint8_t* datetime) {
             tmElements_t tm;
-            String currentDateTime = "Синхронизированы дата и время: ";
+            String currentDateTime = "Date and time are synchronized: ";
             
             // Заполняем структуру tmElements_t из массива
             tm.Day = datetime[0];          // День (1-31)
