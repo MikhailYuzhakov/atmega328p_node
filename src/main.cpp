@@ -19,6 +19,7 @@
 #define INT0_PIN 2 //пин для пробуждения
 #define MAX_PACKET_SIZE 100
 #define DATETIME_PACKET_SIZE 6
+#define ANSWER_TIMEOUT 10000
 
 SoftwareSerial mySerial(5, 6); // RX, TX
 OneWire oneWire(DS18B20_PIN);
@@ -72,23 +73,18 @@ void clearInputOutputBuffer() {
 
 //a3 f5 e2 d8 1c 9b 4e 7f
 void setup() {
-  mySerial.begin(9600);
-  // pinMode(INT0_PIN, INPUT_PULLUP);
-  // pwrManager.setupInterrupt(INT0_PIN);
+  mySerial.begin(115200);
 
   mySerial.print("\nAgroprobe ID: ");
   uuid = readID();
-  mySerial.print("\nAlarm period: ");
-  mySerial.print(EEPROM.read(8));
-  mySerial.print(":");
-  mySerial.println(EEPROM.read(9));
+  mySerial.printf("\nAlarm period: %uh:%um\n", EEPROM.read(8), EEPROM.read(9));
 
-  mySerial.println(rtc.init());
-  mySerial.println(sensors.init());
-  mySerial.println(sx1276.init());
+  rtc.init(mySerial);
+  sensors.init(mySerial);
+  sx1276.init(mySerial);
 
-  mySerial.println(sx1276.sendHandshakePacket(uuid));
-  mySerial.println(sx1276.receivePacket(dataIn));
+  sx1276.sendHandshakePacket(uuid, mySerial);
+  sx1276.receivePacket(dataIn, mySerial, ANSWER_TIMEOUT);
 
   uint8_t dateTime[6];
   getDateTimeFromPacket(dateTime);
@@ -104,12 +100,14 @@ void loop() {
   uint8_t* dateTime = rtc.getCurrentDateTime();
   for (uint8_t i = 0; i < 6; i++)
     dataOut[pointer++] = dateTime[i]; // записываем с 9 по 14 байт дату и время
-  mySerial.print(sensors.readPressure(dataOut, pointer)); // 15 и 16 байт атмосферное давление
+
+  sensors.readPressure(dataOut, pointer, mySerial); // 15 и 16 байт атмосферное давление
   pointer++; //явно увеличиваем указатель в выходном буффере
 
-  mySerial.print(sensors.readAirTemperature(dataOut, pointer)); // 17-18, 19-20 байт температура с bmp и c htu
+  sensors.readAirTemperature(dataOut, pointer, mySerial); // 17-18, 19-20 байт температура с bmp и c htu
   pointer++;
 
+<<<<<<< HEAD
   mySerial.print(sensors.readAirHumidity(dataOut, pointer)); // 21-22 байт влажность с htu
   pointer++;
 
@@ -118,20 +116,20 @@ void loop() {
   
   mySerial.print(sensors.readSoilTemperature(dataOut,pointer)); // 26-31 байт температуры почвы на глубине 15,10,5 см с ds18b20
   mySerial.println();
+=======
+  sensors.readAirHumidity(dataOut, pointer, mySerial); // 21-22 байт влажность с htu
+>>>>>>> 3c0ef088c30160d6eb31f10c913e1fe4c6f290db
   
-  mySerial.println(sx1276.sendDataPacket(dataOut, pointer));
-  // delay(100);
-  mySerial.println(sx1276.receivePacket(dataIn, 10000));
-  // delay(100);
+  sx1276.sendDataPacket(dataOut, pointer, mySerial);
+  sx1276.receivePacket(dataIn, mySerial, ANSWER_TIMEOUT);
 
   mySerial.println(rtc.setRTCDateTime(&dataIn[9])); // синхронизируем время
 
   pointer = 0;
   
-  mySerial.println(rtc.setAlarm(0, 10));
+  mySerial.println(rtc.setAlarm(1, 0));
   mySerial.println();
   deepSleep.pwrDownMode();
   deepSleep.sleepPinInterrupt(INT0_PIN, FALLING);
-  // pwrManager.enterDeepSleep(INT0_PIN);
 }
 
