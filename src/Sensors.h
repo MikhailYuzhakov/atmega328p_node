@@ -1,6 +1,15 @@
 #include <DS3232RTC.h>
 #include "Adafruit_HTU21DF.h"
 #include <Adafruit_BMP280.h>
+#include <Adafruit_ADS1X15.h>
+#include <DallasTemperature.h>
+
+
+#define DS18B20_PIN A0 //пин data датчика ds18b20
+
+OneWire oneWire_in(DS18B20_PIN); //объявляем класс для onewire
+DallasTemperature sensor_inhouse(&oneWire_in); //объявляем класс для ds18b20
+Adafruit_ADS1115 ads; //class for ADS1115
 
 Adafruit_HTU21DF htu = Adafruit_HTU21DF();
 Adafruit_BMP280 bmp; // I2C
@@ -119,7 +128,7 @@ class Sensors
             return result;
         }
 
-        String readAirHumidity(uint8_t* dataOut, uint8_t pointer) {
+        String readAirHumidity(uint8_t* dataOut, uint8_t &pointer) {
             String result = "";
 
             float airHumidity = htu.readHumidity();
@@ -141,5 +150,108 @@ class Sensors
 
             return result;
         }
+
+        String readSoilHumidity(uint8_t* dataOut, uint8_t &pointer) {
+            String result = "";
+            
+            const float k0 = -0.0085; const float b0 = 164.74;
+            const float k1 = -0.0085; const float b1 = 164.74;
+            const float k2 = -0.0085; const float b2 = 164.74; 
+
+            ads.setGain(GAIN_ONE);
+            if (!ads.begin()) {
+                result = "Failed to initialize ADS1115!";
+                return result;
+            }
+
+            // Выполняем измерения
+            int32_t adc0 = 0, adc1 = 0, adc2 = 0;
+            const uint16_t n = 500; // объем выборки
+            
+            for (uint16_t k = 0; k < n; k++) {
+                adc0 += ads.readADC_SingleEnded(0);
+                adc1 += ads.readADC_SingleEnded(1);
+                adc2 += ads.readADC_SingleEnded(2);
+            }
+            //переводим ads1115 в сон
+
+
+
+            // Рассчитываем средние значения
+            uint16_t adc0_sr = adc0 / n;
+            uint16_t adc1_sr = adc1 / n;
+            uint16_t adc2_sr = adc2 / n;
+            
+            
+           // Ограничиваем значения 0-100%
+            uint8_t h0 = constrain(uint8_t(k0 * adc0_sr + b0), 0, 100);
+            uint8_t h1 = constrain(uint8_t(k1 * adc1_sr + b1), 0, 100);
+            uint8_t h2 = constrain(uint8_t(k2 * adc2_sr + b2), 0, 100);
+         
+            result.reserve(100);
+            result += " hum0_15cm=";
+            result += String(h0);
+            result += "%, hum1_10cm=";
+            result += String(h1);
+            result += "%, hum2_5cm=";
+            result += String(h2);
+            result += "%";
+            
+            dataOut[pointer++] = h0;
+            dataOut[pointer++] = h1;
+            dataOut[pointer] = h2;
+            
+              return result;
+        }
+
+        String readSoilTemperature(uint8_t* dataOut, uint8_t &pointer) {
+            String result = "";
+            sensor_inhouse.begin();
+            // Адреса датчиков (пронумерованы от 0 до 2 снизу вверх). Трейтий датчик ближе всего к поверхности земли
+            const byte ds18b20_0[8] = {0x28, 0x85, 0x69, 0xBE, 0x00, 0x00, 0x00, 0x79};   //номер 18
+            const byte ds18b20_1[8] = {0x28, 0x40, 0xE2, 0x56, 0xB5, 0x01, 0x3C, 0xB3};   //номер 17 
+            const byte ds18b20_2[8] = {0x28, 0x11, 0x40, 0x75, 0xD0, 0x01, 0x3C, 0x72};   //номер 16
+
+            // Запрос температуры от всех датчиков
+            sensor_inhouse.requestTemperatures();
+            
+            // Чтение температуры и проверка на ошибки
+            float temp0 = sensor_inhouse.getTempC(ds18b20_0);
+            float temp1 = sensor_inhouse.getTempC(ds18b20_1);
+            float temp2 = sensor_inhouse.getTempC(ds18b20_2);
+
+            // if (temp0 == DEVICE_DISCONNECTED_C || 
+            //     temp1 == DEVICE_DISCONNECTED_C || 
+            //     temp2 == DEVICE_DISCONNECTED_C) {
+            //     // result = "Error reading DS18B20 sensors";
+            //     // return result;
+            // }
+
+            // Преобразование температуры в целые числа (×100)
+            uint16_t temp0_int = temp0 * 100;
+            uint16_t temp1_int = temp1 * 100;
+            uint16_t temp2_int = temp2 * 100;
+
+            // Формирование строки результата
+            // result.reserve(100);
+            // result += " temp1=";
+            // result += String(temp0, 1);
+            // result += "°C, temp2=";
+            // result += String(temp1, 1);
+            // result += "°C, temp3=";
+            // result += String(temp2, 1);
+            // result += "°C";
+
+            // Запись данных в выходной массив
+            dataOut[pointer++] = (temp0_int >> 8) & 0xFF;
+            dataOut[pointer++] = temp0_int & 0xFF;
+            dataOut[pointer++] = (temp1_int >> 8) & 0xFF;
+            dataOut[pointer++] = temp1_int & 0xFF;
+            dataOut[pointer++] = (temp2_int >> 8) & 0xFF;
+            dataOut[pointer] = temp2_int & 0xFF;
+
+             return result;
+        }
+
 };
 

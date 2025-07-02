@@ -74,8 +74,8 @@ class Transiever
             // pinMode(RXEN, OUTPUT);
 
             LoRa.setPins(NSS, RST, DIO0);
-            if (LoRa.begin(868E6)) 
-                result += "SX1276 is ok.";
+            if (LoRa.begin(868E6)) {}
+                // result += "SX1276 is ok.";
             else result += "SX1276 is failed.";
 
             LoRa.setSignalBandwidth(bw);
@@ -84,10 +84,10 @@ class Transiever
             LoRa.setTxPower(pwr);
             // txEnable();
 
-            result = result + "\nПараметры SX1276:\nЧастота = " + freq + " Гц\n";
-            result = result + "Ширина полосы = " + bw + " Гц\n";
-            result = result + "Spreading factor = " + sf + "\n";
-            // result = result + "Мощность = " + pwr + " дБм\n";       
+            // result = result + "\nПараметры SX1276:\nЧастота = " + freq + " Гц\n";
+            // result = result + "Ширина полосы = " + bw + " Гц\n";
+            // result = result + "Spreading factor = " + sf + "\n";
+                        // result = result + "Мощность = " + pwr + " дБм\n";       
             return result;
         }
 
@@ -185,12 +185,12 @@ class Transiever
             uint8_t calculatedCrc = crc8_bitwise(dataIn, i-2);
             uint8_t receivedCrc = dataIn[i-1];
 
-            result += "\nCRC: Пакет=";
-            snprintf(hexBuf, sizeof(hexBuf), "%02X", receivedCrc);
-            result += hexBuf;
-            result += " Вычислено=";
-            snprintf(hexBuf, sizeof(hexBuf), "%02X", calculatedCrc);
-            result += hexBuf;
+            // result += "\nCRC: Пакет=";
+            // snprintf(hexBuf, sizeof(hexBuf), "%02X", receivedCrc);
+            // result += hexBuf;
+            // result += " Вычислено=";
+            // snprintf(hexBuf, sizeof(hexBuf), "%02X", calculatedCrc);
+            // result += hexBuf;
 
             if (calculatedCrc == receivedCrc) {
                 result += " (Верно)";

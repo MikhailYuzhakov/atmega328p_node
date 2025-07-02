@@ -111,6 +111,12 @@ void loop() {
   pointer++;
 
   mySerial.print(sensors.readAirHumidity(dataOut, pointer)); // 21-22 байт влажность с htu
+  pointer++;
+
+  mySerial.print(sensors.readSoilHumidity(dataOut,pointer)); // 23,24,25 байт влажность почвы на глубине 15,10,5 см
+  pointer++;
+  
+  mySerial.print(sensors.readSoilTemperature(dataOut,pointer)); // 26-31 байт температуры почвы на глубине 15,10,5 см с ds18b20
   mySerial.println();
   
   mySerial.println(sx1276.sendDataPacket(dataOut, pointer));
