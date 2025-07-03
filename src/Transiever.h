@@ -68,36 +68,22 @@ class Transiever
             pwr = EEPROM.read(14);
 
             LoRa.setPins(NSS, RST, DIO0);
-<<<<<<< HEAD
-            if (LoRa.begin(868E6)) {}
-                // result += "SX1276 is ok.";
-            else result += "SX1276 is failed.";
-=======
             if (LoRa.begin(freq)) 
                 mySerial.print("Transiever...ok\n");
             else 
                 mySerial.print("Transiever...failed\n");
->>>>>>> 3c0ef088c30160d6eb31f10c913e1fe4c6f290db
 
             LoRa.setSignalBandwidth(bw);
             LoRa.setSpreadingFactor(sf);
             LoRa.setCodingRate4(cr);
             LoRa.setTxPower(pwr);
 
-<<<<<<< HEAD
-            // result = result + "\nПараметры SX1276:\nЧастота = " + freq + " Гц\n";
-            // result = result + "Ширина полосы = " + bw + " Гц\n";
-            // result = result + "Spreading factor = " + sf + "\n";
-                        // result = result + "Мощность = " + pwr + " дБм\n";       
-            return result;
-=======
             mySerial.println("Transiever config:");
             mySerial.printf("Frequency = %lu Hz\n", freq);
             mySerial.printf("Bandwidth = %lu Hz\n", bw);
             mySerial.printf("Spreading factor = %u\n", sf);
             mySerial.printf("Coding rate = %u\n", cr);
             mySerial.printf("Power = %d dBm\n", pwr);
->>>>>>> 3c0ef088c30160d6eb31f10c913e1fe4c6f290db
         }
 
         void sendHandshakePacket(uint64_t uuid, SoftwareSerial &mySerial) {
@@ -193,19 +179,10 @@ class Transiever
             uint8_t calculatedCrc = crc8_bitwise(dataIn, i-2);
             uint8_t receivedCrc = dataIn[i-1];
 
-<<<<<<< HEAD
-            // result += "\nCRC: Пакет=";
-            // snprintf(hexBuf, sizeof(hexBuf), "%02X", receivedCrc);
-            // result += hexBuf;
-            // result += " Вычислено=";
-            // snprintf(hexBuf, sizeof(hexBuf), "%02X", calculatedCrc);
-            // result += hexBuf;
-=======
             snprintf(hexBuf, sizeof(hexBuf), "%02X", receivedCrc);
             mySerial.print(" CRC8: in packet = 0x" + String(hexBuf));
             snprintf(hexBuf, sizeof(hexBuf), "%02X", calculatedCrc);
             mySerial.print(" calculated = 0x" + String(hexBuf));
->>>>>>> 3c0ef088c30160d6eb31f10c913e1fe4c6f290db
 
             if (calculatedCrc == receivedCrc) {
                 mySerial.print(" correct\n");

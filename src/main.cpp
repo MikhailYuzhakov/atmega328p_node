@@ -81,6 +81,7 @@ void setup() {
 
   rtc.init(mySerial);
   sensors.init(mySerial);
+  // sensors.saveCounterToEEPROM(0);//отправляем 0 циклов записи, чтобы почистить еепром (только при первом запуске)
   sx1276.init(mySerial);
 
   sx1276.sendHandshakePacket(uuid, mySerial);
@@ -107,21 +108,21 @@ void loop() {
   sensors.readAirTemperature(dataOut, pointer, mySerial); // 17-18, 19-20 байт температура с bmp и c htu
   pointer++;
 
-<<<<<<< HEAD
-  mySerial.print(sensors.readAirHumidity(dataOut, pointer)); // 21-22 байт влажность с htu
+  sensors.readAirHumidity(dataOut, pointer, mySerial); // 21-22 байт влажность с htu
+  pointer++;
+  // digitalWrite(SD_CS, HIGH);
+  
+  sensors.readSoilHumidity(dataOut,pointer,mySerial); // 23,24,25 байт влажность почвы на глубине 15,10,5 см
   pointer++;
 
-  mySerial.print(sensors.readSoilHumidity(dataOut,pointer)); // 23,24,25 байт влажность почвы на глубине 15,10,5 см
-  pointer++;
-  
-  mySerial.print(sensors.readSoilTemperature(dataOut,pointer)); // 26-31 байт температуры почвы на глубине 15,10,5 см с ds18b20
+  sensors.readSoilTemperature(dataOut, pointer, mySerial); // 26-31 байт температуры почвы на глубине 15,10,5 см с ds18b20
+  // digitalWrite(SD_CS, LOW);
   mySerial.println();
-=======
-  sensors.readAirHumidity(dataOut, pointer, mySerial); // 21-22 байт влажность с htu
->>>>>>> 3c0ef088c30160d6eb31f10c913e1fe4c6f290db
-  
+
   sx1276.sendDataPacket(dataOut, pointer, mySerial);
   sx1276.receivePacket(dataIn, mySerial, ANSWER_TIMEOUT);
+
+  sensors.saveToEeprom(dataOut, pointer, mySerial); //резервирование в eeprom
 
   mySerial.println(rtc.setRTCDateTime(&dataIn[9])); // синхронизируем время
 
